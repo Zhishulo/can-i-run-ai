@@ -55,8 +55,8 @@ pub fn detect_hardware() -> HardwareInfo {
 }
 
 /// Prevent child processes from flashing a console window on Windows;
-/// a no-op elsewhere (kept cross-platform so every platform module can
-/// call it unconditionally).
+/// a no-op on macOS (used by macos.rs). Linux's native.rs spawns lspci
+/// directly and needs neither variant.
 #[cfg(windows)]
 pub(crate) fn no_window(cmd: &mut std::process::Command) {
     use std::os::windows::process::CommandExt;
@@ -64,7 +64,7 @@ pub(crate) fn no_window(cmd: &mut std::process::Command) {
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
 pub(crate) fn no_window(_cmd: &mut std::process::Command) {}
 
 /// One-shot CIM query returning "Name|DriverVersion" of the first
