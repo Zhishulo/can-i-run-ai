@@ -8,3 +8,4 @@ pub mod benchmark;
 pub mod engine;
 pub mod hardware;
 pub mod models;
+pub mod store;

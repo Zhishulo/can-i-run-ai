@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
+  clearHistory,
+  deleteHistoryEntry,
   evaluateModels,
   fetchHardwareSpecs, 
+  fetchHistory,
   fetchRuntimes, 
   runRuntimeBenchmark 
 } from './lib/api';
-import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, RuntimeKind } from './types';
+import { BenchmarkMetrics, HardwareSpecs, HistoryEntry, ModelEvaluation, RuntimeKind } from './types';
 import { Header } from './components/Header';
 import { HardwareCard } from './components/HardwareCard';
 import { ContextSlider } from './components/ContextSlider';
 import { BenchmarkRunner } from './components/BenchmarkRunner';
+import { HistoryPanel } from './components/HistoryPanel';
 import { ModelExplorer } from './components/ModelExplorer';
 import { ShareCardModal } from './components/ShareCardModal';
 import { Sparkles, Compass } from 'lucide-react';
@@ -26,10 +30,23 @@ export const App: React.FC = () => {
   const [benchmarking, setBenchmarking] = useState<boolean>(false);
   const [benchmarkingModel, setBenchmarkingModel] = useState<string | null>(null);
   const [latestBenchmark, setLatestBenchmark] = useState<BenchmarkMetrics | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(true);
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
 
   const isZh = lang === 'zh';
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      setHistory(await fetchHistory());
+    } catch (_) {
+      // History is optional; the panel shows an empty state on failure.
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   // Load hardware & runtime status
   const loadSystemInfo = async () => {
@@ -64,6 +81,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadSystemInfo();
+    loadHistory();
   }, []);
 
   // Compatibility reports come from the Rust engine and depend on
@@ -98,12 +116,27 @@ export const App: React.FC = () => {
     try {
       const result = await runRuntimeBenchmark(runtime, modelName);
       setLatestBenchmark(result);
+      loadHistory(); // the run is persisted by the backend; refresh the panel
     } catch (err: any) {
       alert(err.message || '跑分测试遇到问题');
     } finally {
       setBenchmarking(false);
       setBenchmarkingModel(null);
     }
+  };
+
+  const handleDeleteHistory = async (id: number) => {
+    try {
+      await deleteHistoryEntry(id);
+      setHistory((prev) => prev.filter((e) => e.id !== id));
+    } catch (_) {}
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      await clearHistory();
+      setHistory([]);
+    } catch (_) {}
   };
 
   // Hardware gate: no fake fallback — show an explicit state until
@@ -220,6 +253,17 @@ export const App: React.FC = () => {
             benchmarkingModel={benchmarkingModel}
             latestBenchmark={latestBenchmark}
             onRefresh={loadSystemInfo}
+            lang={lang}
+          />
+        </section>
+
+        {/* Section 3.5: Local Benchmark History */}
+        <section>
+          <HistoryPanel
+            entries={history}
+            loading={historyLoading}
+            onDelete={handleDeleteHistory}
+            onClear={handleClearHistory}
             lang={lang}
           />
         </section>

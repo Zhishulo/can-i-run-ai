@@ -116,6 +116,24 @@ export interface RuntimeStatus {
   detail: string | null;
 }
 
+export interface HistoryEntry {
+  id: number;
+  /** Epoch milliseconds. */
+  createdAt: number;
+  runtime: string;
+  model: string;
+  ttftSec: number;
+  promptEvalTokPerSec: number;
+  generationTokPerSec: number;
+  totalTokens: number;
+  totalDurationSec: number;
+  runsCompleted: number;
+  /** One-line hardware description captured at run time. */
+  hardwareSummary: string;
+  /** Rows sharing a fingerprint ran on identical hardware. */
+  hardwareFingerprint: string;
+}
+
 export interface BenchmarkMetrics {
   model: string;
   /** Runtime id: ollama | lmstudio | llamaCpp. */

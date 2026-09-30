@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, RuntimeKind, RuntimeStatus } from '../types';
+import { BenchmarkMetrics, HardwareSpecs, HistoryEntry, ModelEvaluation, RuntimeKind, RuntimeStatus } from '../types';
 
 /**
  * Thin wrappers over the Tauri IPC commands (src-tauri/src/main.rs).
@@ -27,4 +27,17 @@ export async function fetchRuntimes(): Promise<RuntimeStatus[]> {
 /** Warm-up + median-of-3 streaming benchmark on the chosen runtime. */
 export async function runRuntimeBenchmark(runtime: RuntimeKind, model: string): Promise<BenchmarkMetrics> {
   return invoke<BenchmarkMetrics>('run_runtime_benchmark', { runtime, model });
+}
+
+/** Local SQLite history (app data dir) — newest first. */
+export async function fetchHistory(limit = 100): Promise<HistoryEntry[]> {
+  return invoke<HistoryEntry[]>('get_history', { limit });
+}
+
+export async function deleteHistoryEntry(id: number): Promise<void> {
+  return invoke('delete_history_entry', { id });
+}
+
+export async function clearHistory(): Promise<void> {
+  return invoke('clear_history');
 }
