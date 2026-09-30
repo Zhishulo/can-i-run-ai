@@ -304,6 +304,7 @@ export const App: React.FC = () => {
         onClose={() => setShowShareModal(false)}
         hardware={hardware}
         latestBenchmark={latestBenchmark}
+        history={history}
         lang={lang}
       />
 

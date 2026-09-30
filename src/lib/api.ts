@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 import { BenchmarkMetrics, HardwareSpecs, HistoryEntry, ModelEvaluation, RuntimeKind, RuntimeStatus } from '../types';
-
 /**
  * Thin wrappers over the Tauri IPC commands (src-tauri/src/main.rs).
  * All errors propagate to the caller so the UI can show explicit
@@ -40,4 +39,9 @@ export async function deleteHistoryEntry(id: number): Promise<void> {
 
 export async function clearHistory(): Promise<void> {
   return invoke('clear_history');
+}
+
+/** Persist a base64 payload under the app-data exports/ dir; returns the path. */
+export async function saveExportFile(fileName: string, dataBase64: string): Promise<string> {
+  return invoke<string>('save_export_file', { fileName, dataBase64 });
 }

@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
-import { History, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { History, Trash2, TrendingUp, TrendingDown, Minus, Share2 } from 'lucide-react';
 import { HistoryEntry } from '../types';
+import { saveExportFile } from '../lib/api';
 
 interface HistoryPanelProps {
   entries: HistoryEntry[];
@@ -19,6 +20,30 @@ interface Group {
 
 const MAX_ROWS_PER_GROUP = 5;
 
+/** Anonymous community export: hardware summary + fingerprint (a hash),
+ *  never any personal data. Format matches the community-benchmark
+ *  discussion template in the upstream repository. */
+function buildAnonymousPayload(entries: HistoryEntry[]) {
+  return {
+    schema: 1,
+    app: 'can-i-run-ai',
+    submittedBy: 'anonymous',
+    exportedAt: new Date().toISOString(),
+    entries: entries.map((e) => ({
+      runtime: e.runtime,
+      model: e.model,
+      generationTokPerSec: e.generationTokPerSec,
+      ttftSec: e.ttftSec,
+      promptEvalTokPerSec: e.promptEvalTokPerSec,
+      totalTokens: e.totalTokens,
+      runsCompleted: e.runsCompleted,
+      hardwareSummary: e.hardwareSummary,
+      hardwareFingerprint: e.hardwareFingerprint,
+      testedAt: new Date(e.createdAt).toISOString(),
+    })),
+  };
+}
+
 export const HistoryPanel: React.FC<HistoryPanelProps> = ({
   entries,
   loading,
@@ -27,6 +52,28 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
   lang,
 }) => {
   const isZh = lang === 'zh';
+  const [exportState, setExportState] = useState<'idle' | 'busy' | 'copied' | 'saved' | 'error'>('idle');
+
+  // Anonymized export: copy to clipboard AND save a file; both opt-in,
+  // both contain nothing but benchmark numbers + hardware description.
+  const handleExportAnonymous = async () => {
+    setExportState('busy');
+    try {
+      const payload = JSON.stringify(buildAnonymousPayload(entries), null, 2);
+      await navigator.clipboard.writeText(payload).catch(() => {});
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const bytes = new TextEncoder().encode(payload);
+      let binary = '';
+      bytes.forEach((b) => { binary += String.fromCharCode(b); });
+      const path = await saveExportFile(`anonymous-benchmark-${stamp}.json`, btoa(binary));
+      setExportState('copied');
+      setTimeout(() => setExportState('idle'), 4000);
+      void path; // saved under app data exports/, shown in file manager if needed
+    } catch (_) {
+      setExportState('error');
+      setTimeout(() => setExportState('idle'), 4000);
+    }
+  };
 
   // Group by runtime+model so each group can show progression
   // (latest vs previous on the same hardware fingerprint).
@@ -72,12 +119,37 @@ export const HistoryPanel: React.FC<HistoryPanelProps> = ({
             </div>
           </div>
           {entries.length > 0 && (
-            <button
-              onClick={onClear}
-              className="px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-900/40 border border-slate-700/80 hover:border-rose-700/60 text-xs text-slate-300 transition cursor-pointer"
-            >
-              {isZh ? '清空全部' : 'Clear all'}
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleExportAnonymous}
+                disabled={exportState === 'busy'}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer flex items-center space-x-1.5 ${
+                  exportState === 'copied'
+                    ? 'bg-emerald-900/40 border-emerald-700/60 text-emerald-300'
+                    : exportState === 'error'
+                      ? 'bg-rose-900/40 border-rose-700/60 text-rose-300'
+                      : 'bg-slate-900/80 hover:bg-slate-800 border-slate-700/80 text-slate-300'
+                }`}
+                title={isZh ? '仅包含跑分数字与硬件描述，复制到剪贴板并保存文件' : 'Numbers + hardware description only; copied to clipboard and saved'}
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>
+                  {exportState === 'busy'
+                    ? (isZh ? '导出中…' : 'Exporting…')
+                    : exportState === 'copied'
+                      ? (isZh ? '已复制并保存' : 'Copied & saved')
+                      : exportState === 'error'
+                        ? (isZh ? '导出失败' : 'Export failed')
+                        : (isZh ? '导出匿名数据' : 'Export anonymous data')}
+                </span>
+              </button>
+              <button
+                onClick={onClear}
+                className="px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-rose-900/40 border border-slate-700/80 hover:border-rose-700/60 text-xs text-slate-300 transition cursor-pointer"
+              >
+                {isZh ? '清空全部' : 'Clear all'}
+              </button>
+            </div>
           )}
         </div>
 

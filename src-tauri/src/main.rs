@@ -85,6 +85,39 @@ fn clear_history(app: tauri::AppHandle) -> Result<(), String> {
     store::clear(&conn)
 }
 
+/// Persist a user-initiated export (share-card PNG, anonymous JSON)
+/// under the app-data `exports/` directory and return the written path.
+#[tauri::command]
+fn save_export_file(
+    app: tauri::AppHandle,
+    file_name: String,
+    data_base64: String,
+) -> Result<String, String> {
+    // Whitelist a flat filename: no separators, no traversal.
+    let clean: String = file_name
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+        .collect();
+    if clean.is_empty() || clean.contains("..") || clean.starts_with('.') {
+        return Err("Invalid file name".to_string());
+    }
+
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.as_bytes())
+        .map_err(|e| format!("Invalid export payload: {e}"))?;
+
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("exports");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(&clean);
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -95,7 +128,8 @@ fn main() {
             run_runtime_benchmark,
             get_history,
             delete_history_entry,
-            clear_history
+            clear_history,
+            save_export_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running Can I Run AI application");
