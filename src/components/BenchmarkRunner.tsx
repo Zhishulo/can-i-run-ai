@@ -150,6 +150,11 @@ export const BenchmarkRunner: React.FC<BenchmarkRunnerProps> = ({
                     <span className="text-[10px] text-slate-500 font-mono">
                       {new Date(latestBenchmark.timestamp).toLocaleTimeString()}
                     </span>
+                    <span className="text-[10px] text-cyan-400/90 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-medium">
+                      {isZh
+                        ? `中位数 · ${latestBenchmark.runsCompleted} 次实测`
+                        : `Median · ${latestBenchmark.runsCompleted} runs`}
+                    </span>
                   </div>
                   <span className="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">
                     {isZh ? '测试完成' : 'Completed'}
@@ -165,6 +170,9 @@ export const BenchmarkRunner: React.FC<BenchmarkRunnerProps> = ({
                     </span>
                     <div className="text-xl font-bold font-mono text-cyan-400">
                       {latestBenchmark.generationTokPerSec} <span className="text-xs text-slate-400 font-normal">tok/s</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      {latestBenchmark.generationMinTokPerSec} ~ {latestBenchmark.generationMaxTokPerSec} tok/s
                     </div>
                   </div>
 
@@ -185,6 +193,9 @@ export const BenchmarkRunner: React.FC<BenchmarkRunnerProps> = ({
                     </span>
                     <div className="text-xl font-bold font-mono text-emerald-400">
                       {latestBenchmark.ttftSec} <span className="text-xs text-slate-400 font-normal">s</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                      {latestBenchmark.ttftMinSec} ~ {latestBenchmark.ttftMaxSec} s
                     </div>
                   </div>
 

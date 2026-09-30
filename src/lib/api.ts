@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { BenchmarkMetrics, HardwareSpecs, OllamaModelDetail } from '../types';
+import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, OllamaModelDetail } from '../types';
 
 /**
  * Thin wrappers over the Tauri IPC commands (src-tauri/src/main.rs).
@@ -8,6 +8,15 @@ import { BenchmarkMetrics, HardwareSpecs, OllamaModelDetail } from '../types';
  */
 export async function fetchHardwareSpecs(): Promise<HardwareSpecs> {
   return invoke<HardwareSpecs>('get_hardware_info');
+}
+
+/**
+ * Compatibility reports for every model at every supported
+ * quantization, computed by the Rust engine on this machine.
+ * Re-invoke whenever the context length changes.
+ */
+export async function evaluateModels(contextLength: number): Promise<ModelEvaluation[]> {
+  return invoke<ModelEvaluation[]>('evaluate_models', { contextLength });
 }
 
 export async function fetchOllamaModels(): Promise<{ isRunning: boolean; models: OllamaModelDetail[] }> {

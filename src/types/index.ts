@@ -43,11 +43,11 @@ export interface AIModelDefinition {
   maxContextLength: number; // e.g., 32768
   layers: number;
   heads: number;
-  kvHeads?: number; // Grouped-Query Attention (GQA)
+  kvHeads?: number | null; // Grouped-Query Attention (GQA)
   headDim: number;
   description: string;
   recommendedUse: string;
-  ollamaName?: string;
+  ollamaName?: string | null;
 }
 
 export type CompatibilityStatus = 'recommended' | 'runnable' | 'not-recommended' | 'incompatible';
@@ -66,6 +66,16 @@ export interface CompatibilityReport {
   headline: string;
   advice: string;
   canOffloadToGpu: boolean;
+  /** vram | ram | context | none — what actually limits this model. */
+  bottleneck: string;
+}
+
+/**
+ * One model (fields flattened by the Rust engine) plus a
+ * CompatibilityReport per supported quantization.
+ */
+export interface ModelEvaluation extends AIModelDefinition {
+  reports: Partial<Record<QuantizationType, CompatibilityReport>>;
 }
 
 export interface OllamaModelDetail {
@@ -92,4 +102,11 @@ export interface BenchmarkMetrics {
   sampleOutput: string;
   /** Epoch milliseconds (rendered via `new Date(ts)`). */
   timestamp: number;
+  /** Medians are computed over this many measured runs (warm-up excluded). */
+  runsCompleted: number;
+  /** Min/max across measured runs — variance the UI can surface. */
+  ttftMinSec: number;
+  ttftMaxSec: number;
+  generationMinTokPerSec: number;
+  generationMaxTokPerSec: number;
 }

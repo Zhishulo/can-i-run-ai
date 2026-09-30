@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
+  evaluateModels,
   fetchHardwareSpecs, 
   fetchOllamaModels, 
   runOllamaBenchmark 
 } from './lib/api';
-import { MODELS_DATABASE } from './data/models';
-import { BenchmarkMetrics, HardwareSpecs, OllamaModelDetail } from './types';
+import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, OllamaModelDetail } from './types';
 import { Header } from './components/Header';
 import { HardwareCard } from './components/HardwareCard';
 import { ContextSlider } from './components/ContextSlider';
@@ -17,6 +17,8 @@ import { Sparkles, Compass } from 'lucide-react';
 export const App: React.FC = () => {
   const [hardware, setHardware] = useState<HardwareSpecs | null>(null);
   const [hardwareError, setHardwareError] = useState<string | null>(null);
+  const [evaluations, setEvaluations] = useState<ModelEvaluation[]>([]);
+  const [evaluationsError, setEvaluationsError] = useState<string | null>(null);
   const [contextLength, setContextLength] = useState<number>(8192);
   const [ollamaOnline, setOllamaOnline] = useState<boolean>(false);
   const [installedModels, setInstalledModels] = useState<OllamaModelDetail[]>([]);
@@ -52,6 +54,25 @@ export const App: React.FC = () => {
   useEffect(() => {
     loadHardwareAndOllama();
   }, []);
+
+  // Compatibility reports come from the Rust engine and depend on
+  // hardware (fetched once) plus the context slider (re-run on change).
+  useEffect(() => {
+    let cancelled = false;
+    evaluateModels(contextLength)
+      .then((evals) => {
+        if (!cancelled) {
+          setEvaluations(evals);
+          setEvaluationsError(null);
+        }
+      })
+      .catch((err: any) => {
+        if (!cancelled) setEvaluationsError(err?.toString() || '兼容性计算失败');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [contextLength, hardware]);
 
   // Installed model names set for quick lookup
   const installedOllamaNames = useMemo(() => {
@@ -198,22 +219,24 @@ export const App: React.FC = () => {
                 <span>{isZh ? '主流开源模型兼容性评估库' : 'Model Compatibility Explorer'}</span>
               </h3>
               <p className="text-xs text-slate-400">
-                {isZh 
-                  ? '已为你实时测算不同尺寸与量化格式在当前机器上的适配等级与预估生成速度' 
-                  : 'Real-time memory calculations and speed estimates on your machine'}
+                {evaluationsError
+                  ? (isZh ? `计算失败：${evaluationsError}` : `Engine error: ${evaluationsError}`)
+                  : (isZh 
+                    ? '已为你实时测算不同尺寸与量化格式在当前机器上的适配等级与预估生成速度（由本地 Rust 引擎计算）' 
+                    : 'Real-time memory and speed estimates computed by the local Rust engine')}
               </p>
             </div>
           </div>
 
-          <ModelExplorer
-            models={MODELS_DATABASE}
-            hardware={hardware}
-            contextLength={contextLength}
-            installedOllamaModels={installedOllamaNames}
-            onRunBenchmark={handleRunBenchmark}
-            benchmarkingModel={benchmarkingModel}
-            lang={lang}
-          />
+          {evaluationsError ? null : (
+            <ModelExplorer
+              models={evaluations}
+              installedOllamaModels={installedOllamaNames}
+              onRunBenchmark={handleRunBenchmark}
+              benchmarkingModel={benchmarkingModel}
+              lang={lang}
+            />
+          )}
         </section>
       </main>
 
