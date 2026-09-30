@@ -286,6 +286,6 @@ Code changes (in order):
 | M2 Windows first-class | ✅ done | `feat/m2-windows-hardware` | NVML/DXGI/CIM probes, bandwidth table; **verified on real hardware** (i7-13650HX / RTX 4060 Laptop 8GB / driver 566.07) |
 | M3 Runtime ecosystem | ✅ done | `feat/m3-runtimes` | LM Studio / llama.cpp (v0 API + OpenAI SSE); offline runtimes reported with start hints |
 | M4 Local history | ✅ done | `feat/m4-history` | SQLite (rusqlite bundled, app data dir) + hardware fingerprint + same-model compare view |
-| M5 Community & sharing | ⏳ not started | — | anonymous upload / share-card export |
+| M5 Community & sharing | ✅ done (client-side) | `feat/m5-sharing` | Share-card PNG export (real measured runs only), anonymous benchmark data export (schema 1, opt-in, no personal data); **server upload deferred** until community infra exists — GitHub Discussions paste format as the interim |
 
 Gates: `cargo check/test/clippy -D warnings/fmt` and `tsc/vite build` all green; the real-machine smoke test runs via `cargo test -- --ignored` on desktop machines.

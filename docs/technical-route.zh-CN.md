@@ -284,6 +284,6 @@ npm run tauri dev                      # 需 Rust 工具链 (rustup) 与系统 W
 | M2 Windows 一等公民 | ✅ 已完成 | `feat/m2-windows-hardware` | NVML/DXGI/CIM 三级探测、带宽查表；**真机验证**（i7-13650HX / RTX 4060 Laptop 8GB / 驱动 566.07） |
 | M3 运行时生态 | ✅ 已完成 | `feat/m3-runtimes` | LM Studio / llama.cpp 接入（v0 API + OpenAI SSE），离线运行时上报启动提示 |
 | M4 本地历史 | ✅ 已完成 | `feat/m4-history` | SQLite（rusqlite bundled，app data 目录）+ 硬件指纹 + 同模型前后对比视图 |
-| M5 社区库与分享 | ⏳ 未开始 | — | 匿名上传 / 分享卡导出 |
+| M5 社区库与分享 | ✅ 已完成（服务端除外） | `feat/m5-sharing` | 分享卡 PNG 导出（仅显示真实实测）、匿名基准数据导出（schema 1，opt-in，无个人数据）；**服务端上传暂缓**——待社区基础设施（README Phase 4 后端）落地，先以 GitHub Discussions 粘贴格式过渡 |
 
 验证门禁：`cargo check/test/clippy -D warnings/fmt` 与 `tsc/vite build` 全绿；真机 smoke test 经 `cargo test -- --ignored` 在桌面机执行。
