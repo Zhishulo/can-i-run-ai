@@ -54,13 +54,18 @@ pub fn detect_hardware() -> HardwareInfo {
     }
 }
 
-/// Prevent child processes from flashing a console window on Windows.
+/// Prevent child processes from flashing a console window on Windows;
+/// a no-op elsewhere (kept cross-platform so every platform module can
+/// call it unconditionally).
 #[cfg(windows)]
 pub(crate) fn no_window(cmd: &mut std::process::Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     cmd.creation_flags(CREATE_NO_WINDOW);
 }
+
+#[cfg(not(windows))]
+pub(crate) fn no_window(_cmd: &mut std::process::Command) {}
 
 /// One-shot CIM query returning "Name|DriverVersion" of the first
 /// display adapter. PowerShell is used instead of the `wmi` crate to
