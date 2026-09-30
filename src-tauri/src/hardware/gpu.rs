@@ -9,4 +9,9 @@ pub struct GpuInfo {
     /// Backend label shown in the UI: "Metal" on macOS, "CUDA" /
     /// "DirectX 12" on Windows, "Unknown" when detection fails.
     pub metal_support: String,
+    /// nvidia | amd | intel | apple | unknown
+    pub vendor: String,
+    /// Driver version string when the runtime exposes one
+    /// (NVML on NVIDIA, WMI elsewhere); `None` when unknown.
+    pub driver_version: Option<String>,
 }

@@ -1,3 +1,4 @@
+pub mod bandwidth;
 pub mod cpu;
 pub mod gpu;
 pub mod memory;
@@ -59,6 +60,31 @@ pub(crate) fn no_window(cmd: &mut std::process::Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+/// One-shot CIM query returning "Name|DriverVersion" of the first
+/// display adapter. PowerShell is used instead of the `wmi` crate to
+/// keep COM initialization out of the probe path.
+#[cfg(target_os = "windows")]
+pub(crate) fn run_powershell_cim() -> Option<String> {
+    let mut cmd = std::process::Command::new("powershell");
+    cmd.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "(Get-CimInstance -ClassName Win32_VideoController | Select-Object -First 1) | ForEach-Object { \"$($_.Name)|$($_.DriverVersion)\" }",
+    ]);
+    no_window(&mut cmd);
+    let out = cmd.output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
 }
 
 /// CPU / RAM / OS base detection via `sysinfo`, shared by the

@@ -33,7 +33,17 @@ pub fn detect_native_hardware() -> HardwareInfo {
 
     let (gpu, has_nvidia) = match query_lspci_gpu() {
         Some(name) => {
-            let is_nvidia = name.to_lowercase().contains("nvidia");
+            let lower = name.to_lowercase();
+            let is_nvidia = lower.contains("nvidia");
+            let vendor = if is_nvidia {
+                "nvidia"
+            } else if lower.contains("amd") || lower.contains("radeon") || lower.contains("ati") {
+                "amd"
+            } else if lower.contains("intel") {
+                "intel"
+            } else {
+                "unknown"
+            };
             (
                 GpuInfo {
                     model: name,
@@ -44,6 +54,8 @@ pub fn detect_native_hardware() -> HardwareInfo {
                     } else {
                         "Unknown".to_string()
                     },
+                    vendor: vendor.to_string(),
+                    driver_version: None,
                 },
                 is_nvidia,
             )
@@ -54,6 +66,8 @@ pub fn detect_native_hardware() -> HardwareInfo {
                 is_unified_memory: false,
                 vram_gb: 0.0,
                 metal_support: "Unknown".to_string(),
+                vendor: "unknown".to_string(),
+                driver_version: None,
             },
             false,
         ),

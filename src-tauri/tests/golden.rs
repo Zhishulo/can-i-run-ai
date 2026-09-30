@@ -40,6 +40,8 @@ fn machine_mac_mini_8gb() -> HardwareInfo {
             is_unified_memory: true,
             vram_gb: 8.0,
             metal_support: "Metal".into(),
+            vendor: "apple".into(),
+            driver_version: None,
         },
         backends: vec!["Apple Metal".into(), "CPU inference".into()],
     }
@@ -69,6 +71,8 @@ fn machine_m1_pro_16gb() -> HardwareInfo {
             is_unified_memory: true,
             vram_gb: 16.0,
             metal_support: "Metal".into(),
+            vendor: "apple".into(),
+            driver_version: None,
         },
         backends: vec!["Apple Metal".into(), "CPU inference".into()],
     }
@@ -98,6 +102,8 @@ fn machine_rtx_4070_32gb() -> HardwareInfo {
             is_unified_memory: false,
             vram_gb: 12.0,
             metal_support: "CUDA".into(),
+            vendor: "nvidia".into(),
+            driver_version: Some("566.36".into()),
         },
         backends: vec!["NVIDIA CUDA".into(), "CPU inference".into()],
     }

@@ -66,6 +66,8 @@ pub fn detect_macos_hardware() -> HardwareInfo {
                 0.0
             },
             metal_support: "Metal".to_string(),
+            vendor: "apple".to_string(),
+            driver_version: None,
         },
         backends: vec!["Apple Metal".to_string(), "CPU inference".to_string()],
     }

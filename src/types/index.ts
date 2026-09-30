@@ -18,6 +18,10 @@ export interface GpuInfo {
   isUnifiedMemory: boolean;
   metalSupport: string;
   vramGb: number;
+  /** nvidia | amd | intel | apple | unknown */
+  vendor: string;
+  /** Driver version when the runtime exposes one (NVML / WMI). */
+  driverVersion: string | null;
 }
 
 export interface HardwareSpecs {

@@ -61,31 +61,15 @@ pub fn budget(total_ram_gb: f64, free_ram_gb: f64, vram_gb: f64, unified: bool) 
 /// These are placeholder constants — M2 replaces this with
 /// `database/hardware/bandwidth.json` (docs/technical-route.md D6).
 pub fn effective_bandwidth(hw: &crate::hardware::HardwareInfo) -> f64 {
-    if hw.cpu.is_apple_silicon || hw.memory.is_unified {
-        let name = hw.cpu.model.to_uppercase();
-        return if name.contains("ULTRA") {
-            600.0
-        } else if name.contains("MAX") {
-            300.0
-        } else if name.contains("PRO") {
-            150.0
-        } else {
-            80.0
-        };
+    // Table lookup first: GPU model, then CPU model (Apple reports
+    // the SoC as both; unknown discrete chips fall back below).
+    if let Some(bw) = crate::hardware::bandwidth::lookup(&[&hw.gpu.model, &hw.cpu.model]) {
+        return bw;
     }
+    // Conservative fallbacks for chips missing from the table.
     if hw.gpu.vram_gb >= 4.0 {
-        let g = hw.gpu.model.to_uppercase();
-        return if g.contains("RTX 50") || g.contains("RX 9") {
-            900.0
-        } else if g.contains("RTX 40") {
-            500.0
-        } else if g.contains("RTX 30") {
-            450.0
-        } else if g.contains("RX 7") {
-            700.0
-        } else {
-            300.0
-        };
+        300.0
+    } else {
+        60.0
     }
-    60.0
 }
