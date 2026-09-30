@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # Runs on every push (any branch) so forks get CI without needing
+  # base-repo workflow approval; and on PRs against upstream.
   push:
-    branches: [main]
   pull_request:
 
 jobs:

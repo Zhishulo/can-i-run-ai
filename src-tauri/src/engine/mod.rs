@@ -101,6 +101,11 @@ pub fn evaluate(
     context_length: usize,
     quant: &str,
 ) -> CompatibilityReport {
+    // The model cannot run more context than its architecture supports;
+    // estimate at the model's ceiling and say so when clamped.
+    let context_clamped = context_length > model.max_context_length;
+    let context_length = context_length.min(model.max_context_length);
+
     // 1. Model weights (GGUF bpw averages; see models::quant_bits).
     let bits_per_weight = quant_bits(quant).unwrap_or(4.5);
     let params_b = model.parameter_count_billion;
@@ -164,7 +169,13 @@ pub fn evaluate(
         "ram".to_string()
     };
 
-    let (headline, advice) = advice_for(status, context_length);
+    let (headline, mut advice) = advice_for(status, context_length);
+    if context_clamped {
+        advice.push_str(&format!(
+            " 该模型上下文上限为 {}，已按上限估算。",
+            model.max_context_length
+        ));
+    }
 
     CompatibilityReport {
         status,

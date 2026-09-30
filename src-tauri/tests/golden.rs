@@ -198,6 +198,27 @@ fn golden_reports_match_fixture() {
 }
 
 #[test]
+fn context_is_clamped_to_model_max() {
+    let hw = machine_m1_pro_16gb();
+    let model = model("gemma-like", "Gemma", 9.2, 42, 16, Some(8), 256, 8192);
+
+    // Requesting 128k context on an 8k-max model must estimate at the
+    // model's ceiling, not at the requested length…
+    let report = engine::evaluate(&model, &hw, 131072, "Q4_K_M");
+    let at_max = engine::evaluate(&model, &hw, 8192, "Q4_K_M");
+    assert_eq!(
+        report.total_required_memory_gb, at_max.total_required_memory_gb,
+        "context must be clamped to the model's max"
+    );
+    // …and the advice must say so.
+    assert!(
+        report.advice.contains("上下文上限为 8192"),
+        "clamped estimate should explain itself: {}",
+        report.advice
+    );
+}
+
+#[test]
 fn tier_boundaries_behave_monotonically() {
     let hw = machine_m1_pro_16gb();
     let small = model("tiny", "Qwen", 0.5, 24, 14, Some(2), 64, 32768);
