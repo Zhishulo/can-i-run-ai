@@ -3,6 +3,7 @@
 
 use can_i_run_ai::{benchmark, engine, hardware, models};
 
+use benchmark::runtime::RuntimeKind;
 use hardware::HardwareInfo;
 
 #[tauri::command]
@@ -25,19 +26,22 @@ fn evaluate_models(context_length: usize) -> Result<Vec<engine::ModelEvaluation>
     Ok(engine::evaluate_all(&db.models, &hw, context_length))
 }
 
+/// Probe every supported local runtime (Ollama, LM Studio, llama.cpp).
+/// Offline runtimes are reported rather than skipped so the UI can
+/// show how to start each one.
 #[tauri::command]
-async fn check_ollama_status() -> bool {
-    benchmark::ollama::check_ollama_status().await
+async fn list_runtimes() -> Vec<benchmark::runtime::RuntimeStatus> {
+    benchmark::runtime::detect_runtimes().await
 }
 
 #[tauri::command]
-async fn list_ollama_models() -> Result<serde_json::Value, String> {
-    benchmark::ollama::list_ollama_models().await
-}
-
-#[tauri::command]
-async fn run_ollama_benchmark(model: String) -> Result<benchmark::ollama::BenchmarkResult, String> {
-    benchmark::runner::run_benchmark(&model).await
+async fn run_runtime_benchmark(
+    runtime: String,
+    model: String,
+) -> Result<benchmark::BenchmarkResult, String> {
+    let kind =
+        RuntimeKind::from_id(&runtime).ok_or_else(|| format!("Unknown runtime: {runtime}"))?;
+    benchmark::runner::run_benchmark(kind, &model).await
 }
 
 fn main() {
@@ -46,9 +50,8 @@ fn main() {
             get_hardware_info,
             list_models,
             evaluate_models,
-            check_ollama_status,
-            list_ollama_models,
-            run_ollama_benchmark
+            list_runtimes,
+            run_runtime_benchmark
         ])
         .run(tauri::generate_context!())
         .expect("error while running Can I Run AI application");

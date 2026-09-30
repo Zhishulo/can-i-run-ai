@@ -7,6 +7,7 @@
 //! cargo test --test real_machine -- --ignored --nocapture
 //! ```
 
+use can_i_run_ai::benchmark::runtime::{detect_runtimes, RuntimeKind};
 use can_i_run_ai::hardware;
 
 #[test]
@@ -28,5 +29,32 @@ fn real_machine_hardware_smoke() {
     if hw.platform == "windows" && hw.gpu.vendor == "nvidia" {
         assert!(hw.gpu.vram_gb > 0.0, "NVML must report VRAM");
         assert!(hw.gpu.driver_version.is_some(), "NVML must report driver");
+    }
+}
+
+#[test]
+#[ignore = "hits loopback ports of locally installed runtimes"]
+fn real_machine_runtime_detection_smoke() {
+    let statuses = tokio::runtime::Runtime::new()
+        .expect("tokio runtime")
+        .block_on(detect_runtimes());
+
+    for status in &statuses {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(status).expect("RuntimeStatus serializes")
+        );
+    }
+
+    // All three runtimes are always reported, online or not.
+    assert_eq!(statuses.len(), 3);
+    let kinds: Vec<RuntimeKind> = statuses.iter().map(|s| s.kind).collect();
+    assert!(kinds.contains(&RuntimeKind::Ollama));
+    assert!(kinds.contains(&RuntimeKind::LmStudio));
+    assert!(kinds.contains(&RuntimeKind::LlamaCpp));
+    for status in &statuses {
+        if status.online {
+            println!("online: {} — {} models", status.label, status.models.len());
+        }
     }
 }

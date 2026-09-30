@@ -187,6 +187,9 @@ fn golden_reports_match_fixture() {
             fixture.display()
         )
     });
+    // Normalize CRLF: git may check the fixture out with Windows line
+    // endings while the engine serializes with LF.
+    let expected = expected.replace("\r\n", "\n");
     assert_eq!(
         actual, expected,
         "engine output drifted from the golden fixture — if this change is \

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, OllamaModelDetail } from '../types';
+import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, RuntimeKind, RuntimeStatus } from '../types';
 
 /**
  * Thin wrappers over the Tauri IPC commands (src-tauri/src/main.rs).
@@ -19,23 +19,12 @@ export async function evaluateModels(contextLength: number): Promise<ModelEvalua
   return invoke<ModelEvaluation[]>('evaluate_models', { contextLength });
 }
 
-export async function fetchOllamaModels(): Promise<{ isRunning: boolean; models: OllamaModelDetail[] }> {
-  try {
-    const data = await invoke<{ models?: OllamaModelDetail[] }>('list_ollama_models');
-    return { isRunning: true, models: data.models ?? [] };
-  } catch (_) {
-    return { isRunning: false, models: [] };
-  }
+/** Probe Ollama, LM Studio and llama.cpp. Offline runtimes are included. */
+export async function fetchRuntimes(): Promise<RuntimeStatus[]> {
+  return invoke<RuntimeStatus[]>('list_runtimes');
 }
 
-export async function checkOllamaStatus(): Promise<boolean> {
-  return invoke<boolean>('check_ollama_status');
-}
-
-export async function listModels(): Promise<unknown> {
-  return invoke('list_models');
-}
-
-export async function runOllamaBenchmark(modelName: string): Promise<BenchmarkMetrics> {
-  return invoke<BenchmarkMetrics>('run_ollama_benchmark', { model: modelName });
+/** Warm-up + median-of-3 streaming benchmark on the chosen runtime. */
+export async function runRuntimeBenchmark(runtime: RuntimeKind, model: string): Promise<BenchmarkMetrics> {
+  return invoke<BenchmarkMetrics>('run_runtime_benchmark', { runtime, model });
 }

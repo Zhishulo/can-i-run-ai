@@ -96,8 +96,30 @@ export interface OllamaModelDetail {
   };
 }
 
+export type RuntimeKind = 'ollama' | 'lmstudio' | 'llamaCpp';
+
+export interface RuntimeModel {
+  /** Identifier to send back to the runtime. */
+  id: string;
+  display: string;
+  quant: string | null;
+  sizeBytes: number | null;
+}
+
+export interface RuntimeStatus {
+  kind: RuntimeKind;
+  label: string;
+  online: boolean;
+  baseUrl: string;
+  models: RuntimeModel[];
+  /** Short error / offline hint for the UI. */
+  detail: string | null;
+}
+
 export interface BenchmarkMetrics {
   model: string;
+  /** Runtime id: ollama | lmstudio | llamaCpp. */
+  runtime: RuntimeKind;
   ttftSec: number;
   promptEvalTokPerSec: number;
   generationTokPerSec: number;

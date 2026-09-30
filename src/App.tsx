@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   evaluateModels,
   fetchHardwareSpecs, 
-  fetchOllamaModels, 
-  runOllamaBenchmark 
+  fetchRuntimes, 
+  runRuntimeBenchmark 
 } from './lib/api';
-import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, OllamaModelDetail } from './types';
+import { BenchmarkMetrics, HardwareSpecs, ModelEvaluation, RuntimeKind } from './types';
 import { Header } from './components/Header';
 import { HardwareCard } from './components/HardwareCard';
 import { ContextSlider } from './components/ContextSlider';
@@ -20,9 +20,9 @@ export const App: React.FC = () => {
   const [evaluations, setEvaluations] = useState<ModelEvaluation[]>([]);
   const [evaluationsError, setEvaluationsError] = useState<string | null>(null);
   const [contextLength, setContextLength] = useState<number>(8192);
-  const [ollamaOnline, setOllamaOnline] = useState<boolean>(false);
-  const [installedModels, setInstalledModels] = useState<OllamaModelDetail[]>([]);
-  const [selectedBenchmarkModel, setSelectedBenchmarkModel] = useState<string>('');
+  const [runtimes, setRuntimes] = useState<import('./types').RuntimeStatus[]>([]);
+  const [selectedRuntime, setSelectedRuntime] = useState<RuntimeKind>('ollama');
+  const [selectedModels, setSelectedModels] = useState<Record<string, string>>({});
   const [benchmarking, setBenchmarking] = useState<boolean>(false);
   const [benchmarkingModel, setBenchmarkingModel] = useState<string | null>(null);
   const [latestBenchmark, setLatestBenchmark] = useState<BenchmarkMetrics | null>(null);
@@ -31,8 +31,8 @@ export const App: React.FC = () => {
 
   const isZh = lang === 'zh';
 
-  // Load hardware & ollama status
-  const loadHardwareAndOllama = async () => {
+  // Load hardware & runtime status
+  const loadSystemInfo = async () => {
     try {
       const hw = await fetchHardwareSpecs();
       setHardware(hw);
@@ -42,17 +42,28 @@ export const App: React.FC = () => {
     }
 
     try {
-      const ollama = await fetchOllamaModels();
-      setOllamaOnline(ollama.isRunning);
-      setInstalledModels(ollama.models);
-      if (ollama.models.length > 0 && !selectedBenchmarkModel) {
-        setSelectedBenchmarkModel(ollama.models[0].name);
-      }
+      const rt = await fetchRuntimes();
+      setRuntimes(rt);
+      // Default to the first online runtime; remember per-runtime model picks.
+      setSelectedRuntime((prev) => {
+        const prevStatus = rt.find((r) => r.kind === prev);
+        if (prevStatus?.online) return prev;
+        return (rt.find((r) => r.online)?.kind ?? prev) as RuntimeKind;
+      });
+      setSelectedModels((prev) => {
+        const next = { ...prev };
+        for (const r of rt) {
+          if (r.models.length > 0 && !next[r.kind]) {
+            next[r.kind] = r.models[0].id;
+          }
+        }
+        return next;
+      });
     } catch (_) {}
   };
 
   useEffect(() => {
-    loadHardwareAndOllama();
+    loadSystemInfo();
   }, []);
 
   // Compatibility reports come from the Rust engine and depend on
@@ -74,17 +85,18 @@ export const App: React.FC = () => {
     };
   }, [contextLength, hardware]);
 
-  // Installed model names set for quick lookup
+  // Installed Ollama model names for the "installed" badges in the explorer
   const installedOllamaNames = useMemo(() => {
-    return new Set(installedModels.map((m) => m.name));
-  }, [installedModels]);
+    const ollama = runtimes.find((r) => r.kind === 'ollama');
+    return new Set((ollama?.models ?? []).map((m) => m.id));
+  }, [runtimes]);
 
-  // Run benchmark handler
-  const handleRunBenchmark = async (modelName: string) => {
+  // Run benchmark handler (used by the benchmark panel and model cards)
+  const handleRunBenchmark = async (runtime: RuntimeKind, modelName: string) => {
     setBenchmarking(true);
     setBenchmarkingModel(modelName);
     try {
-      const result = await runOllamaBenchmark(modelName);
+      const result = await runRuntimeBenchmark(runtime, modelName);
       setLatestBenchmark(result);
     } catch (err: any) {
       alert(err.message || '跑分测试遇到问题');
@@ -101,8 +113,8 @@ export const App: React.FC = () => {
       <div className="min-h-screen flex flex-col">
         <Header
           hardware={null}
-          ollamaOnline={false}
-          installedCount={0}
+          onlineRuntimeCount={0}
+          totalRuntimeCount={3}
           onOpenShareModal={() => {}}
           lang={lang}
           setLang={setLang}
@@ -118,7 +130,7 @@ export const App: React.FC = () => {
                   {hardwareError}
                 </p>
                 <button
-                  onClick={loadHardwareAndOllama}
+                  onClick={loadSystemInfo}
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-xs font-semibold text-white transition cursor-pointer"
                 >
                   {isZh ? '重试检测' : 'Retry detection'}
@@ -146,8 +158,8 @@ export const App: React.FC = () => {
       {/* Top Navigation */}
       <Header
         hardware={hardware}
-        ollamaOnline={ollamaOnline}
-        installedCount={installedModels.length}
+        onlineRuntimeCount={runtimes.filter((r) => r.online).length}
+        totalRuntimeCount={runtimes.length}
         onOpenShareModal={() => setShowShareModal(true)}
         lang={lang}
         setLang={setLang}
@@ -176,8 +188,8 @@ export const App: React.FC = () => {
 
           <p className="text-sm md:text-base text-slate-400 max-w-2xl mx-auto mt-3">
             {isZh 
-              ? '摆脱盲猜。基于你的物理内存、GPU 显存、KV Cache 开销计算真实兼容性，并联动本地 Ollama 进行真实每秒 Token 速度测算。' 
-              : 'No more guessing. Analyze physical memory, KV Cache overhead, and run live tokens/second benchmarks.'}
+              ? '摆脱盲猜。基于物理内存、GPU 显存、KV Cache 开销计算真实兼容性，并联动本机 Ollama / LM Studio / llama.cpp 进行真实速度实测。' 
+              : 'No more guessing. Real compatibility from RAM, VRAM and KV Cache — live benchmarks via Ollama, LM Studio or llama.cpp.'}
           </p>
         </section>
 
@@ -198,14 +210,16 @@ export const App: React.FC = () => {
         {/* Section 3: Live Benchmark Runner */}
         <section>
           <BenchmarkRunner
-            ollamaOnline={ollamaOnline}
-            installedModels={installedModels}
-            selectedModel={selectedBenchmarkModel}
-            setSelectedModel={setSelectedBenchmarkModel}
+            runtimes={runtimes}
+            selectedRuntime={selectedRuntime}
+            setSelectedRuntime={setSelectedRuntime}
+            selectedModel={selectedModels[selectedRuntime] ?? ''}
+            setSelectedModel={(m) => setSelectedModels((prev) => ({ ...prev, [selectedRuntime]: m }))}
             onRunBenchmark={handleRunBenchmark}
             benchmarking={benchmarking}
+            benchmarkingModel={benchmarkingModel}
             latestBenchmark={latestBenchmark}
-            onRefreshOllama={loadHardwareAndOllama}
+            onRefresh={loadSystemInfo}
             lang={lang}
           />
         </section>
@@ -232,7 +246,7 @@ export const App: React.FC = () => {
             <ModelExplorer
               models={evaluations}
               installedOllamaModels={installedOllamaNames}
-              onRunBenchmark={handleRunBenchmark}
+              onRunBenchmark={(modelName) => handleRunBenchmark('ollama', modelName)}
               benchmarkingModel={benchmarkingModel}
               lang={lang}
             />
