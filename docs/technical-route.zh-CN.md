@@ -282,7 +282,8 @@ npm run tauri dev                      # 需 Rust 工具链 (rustup) 与系统 W
 | M0 跑起来 | ✅ 已完成 | `feat/m0-tauri-ipc` | invoke 接通、真实硬件、流式真 TTFT、删除全部假数据 |
 | M1 量得准 | ✅ 已完成 | `feat/m1-engine` | 引擎收归 Rust、25 模型库统一、预热+3 次中位数跑分、黄金 fixture、CI |
 | M2 Windows 一等公民 | ✅ 已完成 | `feat/m2-windows-hardware` | NVML/DXGI/CIM 三级探测、带宽查表；**真机验证**（i7-13650HX / RTX 4060 Laptop 8GB / 驱动 566.07） |
-| M3 运行时生态 | ⏳ 进行中 | `feat/m3-runtimes` | LM Studio / llama.cpp 接入 |
-| M4 / M5 | ⏳ 未开始 | — | — |
+| M3 运行时生态 | ✅ 已完成 | `feat/m3-runtimes` | LM Studio / llama.cpp 接入（v0 API + OpenAI SSE），离线运行时上报启动提示 |
+| M4 本地历史 | ✅ 已完成 | `feat/m4-history` | SQLite（rusqlite bundled，app data 目录）+ 硬件指纹 + 同模型前后对比视图 |
+| M5 社区库与分享 | ⏳ 未开始 | — | 匿名上传 / 分享卡导出 |
 
 验证门禁：`cargo check/test/clippy -D warnings/fmt` 与 `tsc/vite build` 全绿；真机 smoke test 经 `cargo test -- --ignored` 在桌面机执行。

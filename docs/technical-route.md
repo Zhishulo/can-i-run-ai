@@ -284,7 +284,8 @@ Code changes (in order):
 | M0 Make it run | ✅ done | `feat/m0-tauri-ipc` | invoke wired, real hardware, streaming TTFT, all fake data removed |
 | M1 Measure it right | ✅ done | `feat/m1-engine` | engine consolidated in Rust, 25-model DB, warm-up + median-of-3, golden fixtures, CI |
 | M2 Windows first-class | ✅ done | `feat/m2-windows-hardware` | NVML/DXGI/CIM probes, bandwidth table; **verified on real hardware** (i7-13650HX / RTX 4060 Laptop 8GB / driver 566.07) |
-| M3 Runtime ecosystem | ⏳ in progress | `feat/m3-runtimes` | LM Studio / llama.cpp |
-| M4 / M5 | ⏳ not started | — | — |
+| M3 Runtime ecosystem | ✅ done | `feat/m3-runtimes` | LM Studio / llama.cpp (v0 API + OpenAI SSE); offline runtimes reported with start hints |
+| M4 Local history | ✅ done | `feat/m4-history` | SQLite (rusqlite bundled, app data dir) + hardware fingerprint + same-model compare view |
+| M5 Community & sharing | ⏳ not started | — | anonymous upload / share-card export |
 
 Gates: `cargo check/test/clippy -D warnings/fmt` and `tsc/vite build` all green; the real-machine smoke test runs via `cargo test -- --ignored` on desktop machines.
