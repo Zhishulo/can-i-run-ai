@@ -90,5 +90,6 @@ export interface BenchmarkMetrics {
   totalTokens: number;
   totalDurationSec: number;
   sampleOutput: string;
-  timestamp: string;
+  /** Epoch milliseconds (rendered via `new Date(ts)`). */
+  timestamp: number;
 }

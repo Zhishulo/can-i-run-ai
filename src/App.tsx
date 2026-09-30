@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  DEFAULT_HARDWARE, 
   fetchHardwareSpecs, 
   fetchOllamaModels, 
   runOllamaBenchmark 
@@ -16,7 +15,8 @@ import { ShareCardModal } from './components/ShareCardModal';
 import { Sparkles, Compass } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [hardware, setHardware] = useState<HardwareSpecs>(DEFAULT_HARDWARE);
+  const [hardware, setHardware] = useState<HardwareSpecs | null>(null);
+  const [hardwareError, setHardwareError] = useState<string | null>(null);
   const [contextLength, setContextLength] = useState<number>(8192);
   const [ollamaOnline, setOllamaOnline] = useState<boolean>(false);
   const [installedModels, setInstalledModels] = useState<OllamaModelDetail[]>([]);
@@ -34,7 +34,10 @@ export const App: React.FC = () => {
     try {
       const hw = await fetchHardwareSpecs();
       setHardware(hw);
-    } catch (_) {}
+      setHardwareError(null);
+    } catch (err: any) {
+      setHardwareError(err?.toString() || 'Hardware detection failed');
+    }
 
     try {
       const ollama = await fetchOllamaModels();
@@ -69,6 +72,53 @@ export const App: React.FC = () => {
       setBenchmarkingModel(null);
     }
   };
+
+  // Hardware gate: no fake fallback — show an explicit state until
+  // the backend reports real hardware (retry button on failure).
+  if (!hardware) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header
+          hardware={null}
+          ollamaOnline={false}
+          installedCount={0}
+          onOpenShareModal={() => {}}
+          lang={lang}
+          setLang={setLang}
+        />
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="glass-panel rounded-2xl p-8 max-w-md w-full text-center">
+            {hardwareError ? (
+              <>
+                <h2 className="text-base font-bold text-white mb-2">
+                  {isZh ? '硬件检测失败' : 'Hardware detection failed'}
+                </h2>
+                <p className="text-xs text-slate-400 font-mono break-words mb-4">
+                  {hardwareError}
+                </p>
+                <button
+                  onClick={loadHardwareAndOllama}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-xs font-semibold text-white transition cursor-pointer"
+                >
+                  {isZh ? '重试检测' : 'Retry detection'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-8 h-8 mx-auto mb-3 border-2 border-blue-500/30 border-t-blue-400 rounded-full animate-spin"></div>
+                <h2 className="text-base font-bold text-white">
+                  {isZh ? '正在检测本机硬件…' : 'Detecting your hardware…'}
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  {isZh ? '所有检测均在本地完成，不会上传任何数据' : 'All detection runs locally. Nothing is uploaded.'}
+                </p>
+              </>
+            )}
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col selection:bg-cyan-500/20 selection:text-cyan-200">
