@@ -36,9 +36,7 @@ async fn list_ollama_models() -> Result<serde_json::Value, String> {
 }
 
 #[tauri::command]
-async fn run_ollama_benchmark(
-    model: String,
-) -> Result<benchmark::ollama::BenchmarkResult, String> {
+async fn run_ollama_benchmark(model: String) -> Result<benchmark::ollama::BenchmarkResult, String> {
     benchmark::runner::run_benchmark(&model).await
 }
 

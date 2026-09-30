@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use super::{HardwareInfo, GpuInfo, cpu::CpuInfo, memory::MemoryInfo, no_window, round1, GB};
+use super::{cpu::CpuInfo, memory::MemoryInfo, no_window, round1, GpuInfo, HardwareInfo, GB};
 
 fn sysctl(key: &'static str) -> Option<String> {
     let mut cmd = Command::new("sysctl");
@@ -32,7 +32,8 @@ pub fn detect_macos_hardware() -> HardwareInfo {
     // sysinfo is only used here for free memory; totals come from hw.memsize.
     let free_bytes = sysinfo::System::new_all().free_memory();
 
-    let is_apple = std::env::consts::ARCH == "aarch64" || cpu_brand.to_lowercase().contains("apple");
+    let is_apple =
+        std::env::consts::ARCH == "aarch64" || cpu_brand.to_lowercase().contains("apple");
 
     HardwareInfo {
         platform: "macos".to_string(),
@@ -59,7 +60,11 @@ pub fn detect_macos_hardware() -> HardwareInfo {
                 "macOS GPU".to_string()
             },
             is_unified_memory: is_apple,
-            vram_gb: if is_apple { round1(memsize as f64 / GB) } else { 0.0 },
+            vram_gb: if is_apple {
+                round1(memsize as f64 / GB)
+            } else {
+                0.0
+            },
             metal_support: "Metal".to_string(),
         },
         backends: vec!["Apple Metal".to_string(), "CPU inference".to_string()],

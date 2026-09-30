@@ -1,6 +1,6 @@
-/// Centralized tunables for the compatibility engine.
-/// All ratios are relative to total system RAM unless noted.
-/// See docs/technical-route.md §4.3.
+//! Centralized tunables for the compatibility engine.
+//! All ratios are relative to total system RAM unless noted.
+//! See docs/technical-route.md §4.3.
 
 // --- Unified memory (Apple Silicon) ---
 /// macOS wired-limit heuristic: leave ~22% for OS + active UI.
@@ -30,12 +30,7 @@ pub struct MemoryBudget {
     pub not_recommended_gb: f64,
 }
 
-pub fn budget(
-    total_ram_gb: f64,
-    free_ram_gb: f64,
-    vram_gb: f64,
-    unified: bool,
-) -> MemoryBudget {
+pub fn budget(total_ram_gb: f64, free_ram_gb: f64, vram_gb: f64, unified: bool) -> MemoryBudget {
     if unified {
         return MemoryBudget {
             safe_gb: total_ram_gb * UNIFIED_SAFE_RATIO,

@@ -1,6 +1,6 @@
 pub mod cpu;
-pub mod memory;
 pub mod gpu;
+pub mod memory;
 
 #[cfg(target_os = "macos")]
 pub mod macos;
@@ -12,6 +12,10 @@ pub mod windows;
 pub mod native;
 
 use serde::{Deserialize, Serialize};
+
+pub use cpu::CpuInfo;
+pub use gpu::GpuInfo;
+pub use memory::MemoryInfo;
 
 pub(crate) const GB: f64 = 1024.0 * 1024.0 * 1024.0;
 
@@ -60,7 +64,9 @@ pub(crate) fn no_window(cmd: &mut std::process::Command) {
 /// CPU / RAM / OS base detection via `sysinfo`, shared by the
 /// non-macOS platforms. GPU detection stays platform-specific.
 #[cfg(not(target_os = "macos"))]
-pub(crate) fn detect_sysinfo_base(platform: &str) -> (cpu::CpuInfo, memory::MemoryInfo, String, String) {
+pub(crate) fn detect_sysinfo_base(
+    platform: &str,
+) -> (cpu::CpuInfo, memory::MemoryInfo, String, String) {
     let sys = sysinfo::System::new_all();
 
     let model = sys

@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use super::{HardwareInfo, GpuInfo, detect_sysinfo_base};
+use super::{detect_sysinfo_base, GpuInfo, HardwareInfo};
 
 /// Linux and other Unix-like systems: sysinfo covers CPU/RAM/OS,
 /// lspci provides the first display adapter name when available.
@@ -39,7 +39,11 @@ pub fn detect_native_hardware() -> HardwareInfo {
                     model: name,
                     is_unified_memory: false,
                     vram_gb: 0.0,
-                    metal_support: if is_nvidia { "CUDA".to_string() } else { "Unknown".to_string() },
+                    metal_support: if is_nvidia {
+                        "CUDA".to_string()
+                    } else {
+                        "Unknown".to_string()
+                    },
                 },
                 is_nvidia,
             )

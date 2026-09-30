@@ -41,8 +41,7 @@ pub struct ModelSpec {
 
 impl ModelSpec {
     pub fn kv_heads(&self) -> usize {
-        self.kv_heads
-            .unwrap_or_else(|| (self.heads / 4).max(1))
+        self.kv_heads.unwrap_or_else(|| (self.heads / 4).max(1))
     }
 
     pub fn quant_bits(&self, quant: &str) -> Option<f64> {
@@ -94,10 +93,7 @@ fn validate(db: &ModelDatabase) -> Result<(), String> {
         {
             return Err(format!("{}: unknown quantization format", m.id));
         }
-        if !m
-            .supported_quantizations
-            .contains(&m.default_quantization)
-        {
+        if !m.supported_quantizations.contains(&m.default_quantization) {
             return Err(format!("{}: default quant not in supported list", m.id));
         }
         if m.kv_heads > Some(m.heads) {
@@ -123,7 +119,8 @@ mod tests {
     #[test]
     fn ids_are_unique() {
         let db = load().unwrap();
-        let ids: std::collections::HashSet<&str> = db.models.iter().map(|m| m.id.as_str()).collect();
+        let ids: std::collections::HashSet<&str> =
+            db.models.iter().map(|m| m.id.as_str()).collect();
         assert_eq!(ids.len(), db.models.len());
     }
 

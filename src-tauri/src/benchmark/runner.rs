@@ -134,7 +134,7 @@ fn median(values: &mut [f64]) -> f64 {
         return 0.0;
     }
     let mid = values.len() / 2;
-    if values.len() % 2 == 0 {
+    if values.len().is_multiple_of(2) {
         (values[mid - 1] + values[mid]) / 2.0
     } else {
         values[mid]
@@ -155,9 +155,11 @@ pub async fn run_benchmark(model_name: &str) -> Result<BenchmarkResult, String> 
 
     let mut runs = Vec::with_capacity(MEASURED_RUNS);
     for i in 0..MEASURED_RUNS {
-        runs.push(stream_once(&client, model_name, NUM_PREDICT).await.map_err(|e| {
-            format!("Measurement run {}/{} failed: {e}", i + 1, MEASURED_RUNS)
-        })?);
+        runs.push(
+            stream_once(&client, model_name, NUM_PREDICT)
+                .await
+                .map_err(|e| format!("Measurement run {}/{} failed: {e}", i + 1, MEASURED_RUNS))?,
+        );
     }
 
     let mut ttfts: Vec<f64> = runs.iter().map(|r| r.ttft_sec).collect();
@@ -196,10 +198,22 @@ pub async fn run_benchmark(model_name: &str) -> Result<BenchmarkResult, String> 
         sample_output: median_run.sample_output,
         timestamp,
         runs_completed: runs.len() as u32,
-        ttft_min_sec: round2(runs.iter().map(|r| r.ttft_sec).fold(f64::INFINITY, f64::min)),
+        ttft_min_sec: round2(
+            runs.iter()
+                .map(|r| r.ttft_sec)
+                .fold(f64::INFINITY, f64::min),
+        ),
         ttft_max_sec: round2(runs.iter().map(|r| r.ttft_sec).fold(0.0, f64::max)),
-        generation_min_tok_per_sec: round1(runs.iter().map(|r| r.generation_tok_per_sec).fold(f64::INFINITY, f64::min)),
-        generation_max_tok_per_sec: round1(runs.iter().map(|r| r.generation_tok_per_sec).fold(0.0, f64::max)),
+        generation_min_tok_per_sec: round1(
+            runs.iter()
+                .map(|r| r.generation_tok_per_sec)
+                .fold(f64::INFINITY, f64::min),
+        ),
+        generation_max_tok_per_sec: round1(
+            runs.iter()
+                .map(|r| r.generation_tok_per_sec)
+                .fold(0.0, f64::max),
+        ),
     })
 }
 

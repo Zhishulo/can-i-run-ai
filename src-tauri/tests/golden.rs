@@ -103,6 +103,7 @@ fn machine_rtx_4070_32gb() -> HardwareInfo {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn model(
     id: &str,
     family: &str,
@@ -164,8 +165,8 @@ fn golden_reports_match_fixture() {
     let cases = golden_cases();
     let actual = serde_json::to_string_pretty(&cases).expect("serialize golden cases");
 
-    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/golden_reports.json");
+    let fixture =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/golden_reports.json");
 
     if std::env::var("UPDATE_GOLDEN").is_ok() {
         std::fs::create_dir_all(fixture.parent().unwrap()).unwrap();

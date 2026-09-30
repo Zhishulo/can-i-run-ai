@@ -74,7 +74,11 @@ pub struct ModelEvaluation {
 /// Evaluate every model at every supported quantization against the
 /// detected hardware. Pure computation (no I/O), so the frontend can
 /// re-invoke freely on context-slider changes.
-pub fn evaluate_all(models: &[ModelSpec], hw: &HardwareInfo, context_length: usize) -> Vec<ModelEvaluation> {
+pub fn evaluate_all(
+    models: &[ModelSpec],
+    hw: &HardwareInfo,
+    context_length: usize,
+) -> Vec<ModelEvaluation> {
     models
         .iter()
         .map(|m| {
@@ -91,7 +95,12 @@ pub fn evaluate_all(models: &[ModelSpec], hw: &HardwareInfo, context_length: usi
         .collect()
 }
 
-pub fn evaluate(model: &ModelSpec, hw: &HardwareInfo, context_length: usize, quant: &str) -> CompatibilityReport {
+pub fn evaluate(
+    model: &ModelSpec,
+    hw: &HardwareInfo,
+    context_length: usize,
+    quant: &str,
+) -> CompatibilityReport {
     // 1. Model weights (GGUF bpw averages; see models::quant_bits).
     let bits_per_weight = quant_bits(quant).unwrap_or(4.5);
     let params_b = model.parameter_count_billion;
@@ -99,20 +108,26 @@ pub fn evaluate(model: &ModelSpec, hw: &HardwareInfo, context_length: usize, qua
 
     // 2. KV cache: 2 (K+V) × layers × kv_heads × head_dim × 2 bytes (fp16).
     let kv_heads = model.kv_heads();
-    let kv_bytes_per_token = 2.0 * model.layers as f64 * kv_heads as f64 * model.head_dim as f64 * 2.0;
+    let kv_bytes_per_token =
+        2.0 * model.layers as f64 * kv_heads as f64 * model.head_dim as f64 * 2.0;
     let kv_cache_gb = (kv_bytes_per_token * context_length as f64) / GIB;
 
     // 3. Runtime & driver overhead.
     let overhead_gb = 0.45 + params_b * 0.02;
 
     // 4. Activation scratch buffers.
-    let buffers_gb = (model.heads as f64 * model.head_dim as f64 * context_length as f64 * 4.0 / GIB)
+    let buffers_gb = (model.heads as f64 * model.head_dim as f64 * context_length as f64 * 4.0
+        / GIB)
         .clamp(0.2, 1.5);
 
     let total_gb = weights_gb + kv_cache_gb + overhead_gb + buffers_gb;
 
     let is_apple_silicon = hw.cpu.is_apple_silicon || hw.memory.is_unified;
-    let total_ram_gb = if hw.memory.total_gb > 0.0 { hw.memory.total_gb } else { 16.0 };
+    let total_ram_gb = if hw.memory.total_gb > 0.0 {
+        hw.memory.total_gb
+    } else {
+        16.0
+    };
     let budget = thresholds::budget(
         total_ram_gb,
         hw.memory.free_gb,
@@ -136,13 +151,14 @@ pub fn evaluate(model: &ModelSpec, hw: &HardwareInfo, context_length: usize, qua
         0
     };
 
-    let estimated_tokens_per_second = estimate_speed(status, thresholds::effective_bandwidth(hw), weights_gb);
+    let estimated_tokens_per_second =
+        estimate_speed(status, thresholds::effective_bandwidth(hw), weights_gb);
 
     let bottleneck = if status == Status::Recommended {
         "none".to_string()
     } else if kv_cache_gb > weights_gb {
         "context".to_string()
-    } else if hw.gpu.vram_gb > 0.0 && weights_gb > hw.gpu.vram_gb {
+    } else if !is_apple_silicon && hw.gpu.vram_gb > 0.0 && weights_gb > hw.gpu.vram_gb {
         "vram".to_string()
     } else {
         "ram".to_string()

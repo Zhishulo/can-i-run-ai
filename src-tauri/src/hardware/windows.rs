@@ -1,8 +1,6 @@
 use std::process::Command;
 
-use super::{
-    HardwareInfo, GpuInfo, cpu::CpuInfo, detect_sysinfo_base, memory::MemoryInfo, no_window,
-};
+use super::{detect_sysinfo_base, no_window, GpuInfo, HardwareInfo};
 
 /// NVIDIA GPUs report name and VRAM reliably via nvidia-smi.
 fn query_nvidia_smi() -> Option<(String, f64)> {
