@@ -9,6 +9,8 @@
 | Baseline | commit `5ea0297` "New update with antigravity" |
 | Status | awaiting maintainer review |
 
+> **Status update (2026-09-30, after M2)**: three design decisions were revised to match the actual implementation — D1 (hand-written type mirrors + golden fixtures instead of tauri-specta, which is deferred), D5 (WMI queries via PowerShell CIM, DXGI via the windows crate, NVML as a feature-gated dependency), §4.2 (flat model schema instead of nested arch). M0/M1/M2 are implemented and pass all gates; see "Implementation progress" at the end.
+
 ---
 
 ## 0. TL;DR
@@ -80,10 +82,10 @@ Design principles (aligned with the README):
 
 ## 3. Key design decisions
 
-### D1 Communication: Tauri IPC only, with generated bindings
-- Add `@tauri-apps/api` (runtime) and `@tauri-apps/cli` (tooling); adopt `tauri-specta` v2 to generate `src/bindings.ts` from Rust command signatures.
-- Alternative: hand-written TS mirror types plus a serialization round-trip test. Cheaper, but relies on manual syncing — not recommended.
-- Remove all `fetch('/api/...')`; Rust structs use `#[serde(rename_all = "camelCase")]` to match frontend conventions.
+### D1 Communication: Tauri IPC only (revised)
+- Add `@tauri-apps/api` (runtime) and `@tauri-apps/cli` (tooling).
+- ~~Generate bindings with `tauri-specta` v2~~ **Revised (2026-09-30, shipped in M1)**: hand-written TS mirror types instead — Rust structs use `#[serde(rename_all = "camelCase")]` with field names matching the frontend interfaces one-to-one; type drift is guarded by the golden fixture snapshot test (engine output compared against a committed JSON fixture, doubling as the serialization contract). tauri-specta can be revisited once the toolchain and dependency matrix stabilize.
+- Remove all `fetch('/api/...')`; no extra REST layer.
 
 ### D2 Compatibility engine: single implementation in Rust
 - Create `src-tauri/src/engine/` (replacing `compatibility/`) with a pure entry point:
@@ -117,10 +119,10 @@ pub trait Probe { fn detect(&self) -> Result<HardwareInfo, ProbeError>; }
 ```
 - `HardwareInfo` must gain: `osVersion`, `freeMemoryBytes` (real values, mandatory), `gpus: Vec<Gpu>` (multi-GPU), `Gpu.vram_bytes`, and justified `backends` (Metal/CUDA/ROCm/Vulkan/CPU).
 - macOS: keep sysctl; real GPU chip name later via `IOReport`/`system_profiler`.
-- Windows (M2, `windows.rs`):
-  - CPU/RAM: `wmi` crate (`Win32_Processor`, `Win32_PhysicalMemory`), or `sysinfo` (already a dependency) as the M0 quick path;
-  - GPU enumeration: `Win32_VideoController` (name, driver); VRAM: `nvml-wrapper` for NVIDIA (feature-gated), DXGI/`D3DKMT` adapter memory as generic fallback; integrated GPUs reported as shared memory;
-  - CUDA detection: `nvidia-smi` presence + successful NVML init.
+- Windows (M2, `windows.rs`, **shipped**):
+  - CPU/RAM: `sysinfo` (the `wmi` crate is deliberately not introduced; CIM queries run through a windowless PowerShell child process);
+  - GPU three-stage probe: NVIDIA via `nvml-wrapper` (feature `nvml`, default on, compiled only on Windows) → all vendors via DXGI enumeration with the `windows` crate (name / dedicated VRAM / vendor id, skipping software render drivers, largest dedicated-memory adapter wins) → driver version via PowerShell CIM; `Win32_VideoController.AdapterRAM` is never used as VRAM (32-bit wrap above 4 GB);
+  - CUDA detection: successful NVML init.
 - Linux (end of M2): `/proc/meminfo`, `lspci`, `nvidia-smi`.
 
 ### D6 Speed estimation: always labeled "estimated"
@@ -155,27 +157,31 @@ gpus: [ { name, vendor: nvidia|amd|intel|apple|unknown, vramBytes, isIntegrated,
 backends: [ { kind: metal|cuda|rocm|vulkan|cpu, detail } ]
 ```
 
-### 4.2 Model DB schema (v1)
+### 4.2 Model DB schema (v1, shipped: flat fields)
 
 ```jsonc
+// Mirrors the frontend AIModelDefinition; currently a single file with 25 models.
+// Nested arch and MoE (activeParamsB) are deferred to v2.
 {
   "schema": 1,
-  "id": "qwen3-8b",
-  "name": "Qwen3 8B Instruct",
-  "family": "Qwen",
-  "totalParamsB": 8.2,
-  "activeParamsB": null,          // MoE only, e.g. Qwen3-30B-A3B → 3.3
-  "arch": { "layers": 36, "heads": 32, "kvHeads": 8, "headDim": 128,
-            "attention": "gqa", "maxContext": 40960 },
-  "quants": ["Q2_K","Q3_K_M","Q4_K_M","Q5_K_M","Q6_K","Q8_0","FP16"],
-  "defaultQuant": "Q4_K_M",
-  "ollamaName": "qwen3:8b",
-  "notes": { "zh": "…", "en": "…" }
+  "models": [{
+    "id": "qwen-3-8b",
+    "name": "Qwen 3 8B Instruct",
+    "family": "Qwen",
+    "parameterCountBillion": 8.2,
+    "layers": 32, "heads": 32, "kvHeads": 8, "headDim": 128,
+    "maxContextLength": 40960,
+    "supportedQuantizations": ["Q3_K_M","Q4_K_M","Q5_K_M","Q8_0","FP16"],
+    "defaultQuantization": "Q4_K_M",
+    "ollamaName": "qwen3:8b",
+    "description": "…",
+    "recommendedUse": "…"
+  }]
 }
 ```
 
-- Speed estimation uses `activeParamsB ?? totalParamsB`; weight size always uses `totalParamsB`.
-- One file per model under `database/models/` — smaller PRs, fewer merge conflicts than one big JSON.
+- Speed estimation currently uses `totalParamsB` only (no MoE in the database yet; switches to `activeParamsB ?? totalParamsB` once v2 lands).
+- Currently one file, `database/models/models.json` (25 models); splitting into per-model files awaits collaboration scale. Rust-side validation already covers unique ids, quantization validity and architecture sanity.
 
 ### 4.3 Compatibility engine spec
 
@@ -268,3 +274,17 @@ Code changes (in order):
 3. Frontend: drop the `DEFAULT_HARDWARE` fallback; show loading/error states.
 4. `main.rs`: add a `list_models` command reading `database/models/models.json` (single file for M0; split at M1).
 5. First PR contains exactly the above; suggested title: `fix: wire frontend to Tauri IPC and remove fake data (M0)`.
+
+---
+
+## 9. Implementation progress (2026-09-30)
+
+| Milestone | Status | Branch | Notes |
+|---|---|---|---|
+| M0 Make it run | ✅ done | `feat/m0-tauri-ipc` | invoke wired, real hardware, streaming TTFT, all fake data removed |
+| M1 Measure it right | ✅ done | `feat/m1-engine` | engine consolidated in Rust, 25-model DB, warm-up + median-of-3, golden fixtures, CI |
+| M2 Windows first-class | ✅ done | `feat/m2-windows-hardware` | NVML/DXGI/CIM probes, bandwidth table; **verified on real hardware** (i7-13650HX / RTX 4060 Laptop 8GB / driver 566.07) |
+| M3 Runtime ecosystem | ⏳ in progress | `feat/m3-runtimes` | LM Studio / llama.cpp |
+| M4 / M5 | ⏳ not started | — | — |
+
+Gates: `cargo check/test/clippy -D warnings/fmt` and `tsc/vite build` all green; the real-machine smoke test runs via `cargo test -- --ignored` on desktop machines.

@@ -9,6 +9,8 @@
 | 基线 | commit `5ea0297` "New update with antigravity" |
 | 状态 | 待维护者评审 |
 
+> **状态更新（2026-09-30，M2 完成后）**：三处设计决策已按实际实现修订——D1（类型绑定改用手写镜像 + 黄金 fixture 防漂移，tauri-specta 推迟）、D5（WMI 查询经 PowerShell CIM 完成、DXGI 使用 windows crate、NVML 为 feature 门控依赖）、§4.2（模型 schema 采用扁平字段而非嵌套 arch）。M0/M1/M2 已实现并通过全部验证门禁，见文末「实施进度」。
+
 ---
 
 ## 0. 一页摘要
@@ -78,10 +80,10 @@
 
 ## 3. 核心设计决策
 
-### D1 前后端通信：仅用 Tauri IPC + 自动类型绑定
-- 安装 `@tauri-apps/api`（运行时）与 `@tauri-apps/cli`（工程化），引入 `tauri-specta` v2，由 Rust 命令签名生成 `src/bindings.ts`。
-- 备选方案：手写 TS 镜像类型 + 一个"序列化往返"同步测试。成本更低，但依赖人肉同步，暂不推荐。
-- 删除所有 `fetch('/api/...')`；Rust 侧统一 `#[serde(rename_all = "camelCase")]`，与前端命名习惯一致。
+### D1 前后端通信：仅用 Tauri IPC（已修订）
+- 安装 `@tauri-apps/api`（运行时）与 `@tauri-apps/cli`（工程化）。
+- ~~引入 `tauri-specta` v2 自动生成绑定~~ **修订（2026-09-30，M1 实装）**：改用手写 TS 镜像类型——Rust 结构体统一 `#[serde(rename_all = "camelCase")]`，字段名与前端接口一一对应；类型漂移由黄金 fixture 快照测试兜底（引擎输出与提交进仓库的 JSON fixture 比对，同时充当序列化契约）。tauri-specta 可在工具链与依赖矩阵稳定后再引入。
+- 删除所有 `fetch('/api/...')`；不引入额外 REST 层。
 
 ### D2 兼容性引擎：唯一实现放在 Rust
 - 新建 `src-tauri/src/engine/`（替代 `compatibility/`），入口为纯函数：
@@ -115,10 +117,10 @@ pub trait Probe { fn detect(&self) -> Result<HardwareInfo, ProbeError>; }
 ```
 - `HardwareInfo` 需补充：`osVersion`、`freeMemoryBytes`（必须真实，不能省）、`gpus: Vec<Gpu>`（多卡）、`Gpu.vram_bytes`、`backends`（Metal/CUDA/ROCm/Vulkan/CPU 的判定依据）。
 - macOS：沿用 sysctl，GPU 部分后续用 `IOReport`/`system_profiler` 补真实芯片名。
-- Windows（M2，`windows.rs`）：
-  - CPU/内存：`wmi` crate（`Win32_Processor`、`Win32_PhysicalMemory`），或先用已在依赖里的 `sysinfo` 快速兜底（M0）；
-  - GPU 枚举：`Win32_VideoController`（名称、驱动版本）；VRAM：NVIDIA 用 `nvml-wrapper`（feature 门控），通用回退 `DXGI`/`D3DKMT` 查询适配器内存；集显显存报告为"共享"；
-  - CUDA 检测：`nvidia-smi` 存在性 + NVML 初始化成功。
+- Windows（M2，`windows.rs`，**已实装**）：
+  - CPU/内存：`sysinfo`（`wmi` crate 暂不引入；CIM 查询经 PowerShell 无窗口进程完成）；
+  - GPU 三级探测：NVIDIA 走 `nvml-wrapper`（feature `nvml`，默认开启，仅在 Windows 平台编译）→ 全厂商走 `windows` crate 的 DXGI 枚举（名称 / 专用显存 / 厂商 ID，跳过软件渲染适配器，取专用显存最大者）→ 驱动版本经 PowerShell CIM 查询；`Win32_VideoController.AdapterRAM` 因 32 位溢出从不作为显存来源；
+  - CUDA 检测：NVML 初始化成功。
 - Linux（M2 末）：`/proc/meminfo`、`lspci`、`nvidia-smi`。
 
 ### D6 速度估算：显式标注"预估值"
@@ -153,27 +155,31 @@ gpus: [ { name, vendor: nvidia|amd|intel|apple|unknown, vramBytes, isIntegrated,
 backends: [ { kind: metal|cuda|rocm|vulkan|cpu, detail } ]
 ```
 
-### 4.2 模型库 schema（v1）
+### 4.2 模型库 schema（v1，已实装：扁平字段）
 
 ```jsonc
+// 与前端 AIModelDefinition 一一对应；当前为单文件 25 个模型。
+// 嵌套 arch 与 MoE（activeParamsB）留待 v2。
 {
   "schema": 1,
-  "id": "qwen3-8b",
-  "name": "Qwen3 8B Instruct",
-  "family": "Qwen",
-  "totalParamsB": 8.2,
-  "activeParamsB": null,          // MoE 才填，如 Qwen3-30B-A3B 填 3.3
-  "arch": { "layers": 36, "heads": 32, "kvHeads": 8, "headDim": 128,
-            "attention": "gqa", "maxContext": 40960 },
-  "quants": ["Q2_K","Q3_K_M","Q4_K_M","Q5_K_M","Q6_K","Q8_0","FP16"],
-  "defaultQuant": "Q4_K_M",
-  "ollamaName": "qwen3:8b",
-  "notes": { "zh": "…", "en": "…" }
+  "models": [{
+    "id": "qwen-3-8b",
+    "name": "Qwen 3 8B Instruct",
+    "family": "Qwen",
+    "parameterCountBillion": 8.2,
+    "layers": 32, "heads": 32, "kvHeads": 8, "headDim": 128,
+    "maxContextLength": 40960,
+    "supportedQuantizations": ["Q3_K_M","Q4_K_M","Q5_K_M","Q8_0","FP16"],
+    "defaultQuantization": "Q4_K_M",
+    "ollamaName": "qwen3:8b",
+    "description": "…（中文）",
+    "recommendedUse": "…（中文）"
+  }]
 }
 ```
 
-- 速度估算用 `activeParamsB ?? totalParamsB`；权重体积永远用 `totalParamsB`。
-- `database/models/` 一模型一文件，便于 PR 审阅与冲突合并（比单文件大 JSON 更适合协作）。
+- 速度估算当前仅用 `totalParamsB`（暂无 MoE 入库；v2 引入后改用 `activeParamsB ?? totalParamsB`）。
+- 当前为单文件 `database/models/models.json`（25 模型）；拆分一模型一文件待协作规模需要时进行，Rust 侧校验已覆盖唯一 id、量化合法性与架构字段。
 
 ### 4.3 兼容性引擎 spec
 
@@ -266,3 +272,17 @@ npm run tauri dev                      # 需 Rust 工具链 (rustup) 与系统 W
 3. 前端：删除 `DEFAULT_HARDWARE` 兜底，改为 loading/error 状态。
 4. `main.rs`：补 `list_models` 命令，从 `database/models/models.json` 读取（M0 先整文件，M1 拆分）。
 5. 首个 PR 只做上述内容，标题建议 `fix: wire frontend to Tauri IPC and remove fake data (M0)`。
+
+---
+
+## 9. 实施进度（2026-09-30）
+
+| 里程碑 | 状态 | 分支 | 备注 |
+|---|---|---|---|
+| M0 跑起来 | ✅ 已完成 | `feat/m0-tauri-ipc` | invoke 接通、真实硬件、流式真 TTFT、删除全部假数据 |
+| M1 量得准 | ✅ 已完成 | `feat/m1-engine` | 引擎收归 Rust、25 模型库统一、预热+3 次中位数跑分、黄金 fixture、CI |
+| M2 Windows 一等公民 | ✅ 已完成 | `feat/m2-windows-hardware` | NVML/DXGI/CIM 三级探测、带宽查表；**真机验证**（i7-13650HX / RTX 4060 Laptop 8GB / 驱动 566.07） |
+| M3 运行时生态 | ⏳ 进行中 | `feat/m3-runtimes` | LM Studio / llama.cpp 接入 |
+| M4 / M5 | ⏳ 未开始 | — | — |
+
+验证门禁：`cargo check/test/clippy -D warnings/fmt` 与 `tsc/vite build` 全绿；真机 smoke test 经 `cargo test -- --ignored` 在桌面机执行。
